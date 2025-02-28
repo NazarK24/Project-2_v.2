@@ -1,0 +1,76 @@
+name: Backend RDS CI/CD
+
+on:
+  push:
+    paths:
+      - 'backend_rds/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Docker image version
+        id: version
+        run: echo "IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to AWS ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          REPO_NAME="my-demo-backend-rds"
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          docker build -t $IMAGE_URI --build-arg VERSION=$IMAGE_VERSION ./backend_rds
+          docker push $IMAGE_URI
+
+      - name: Create backend_rds.tfvars
+        run: |
+          echo "backend_rds_image_tag = \"$IMAGE_VERSION\"" > backend_rds.tfvars
+
+      - name: Upload backend_rds.tfvars as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-rds-vars
+          path: backend_rds.tfvars
+          retention-days: 1
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Оновити Task Definition, деплоїти
+        run: |
+          REPO_NAME="my-demo-backend-rds"
+          IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          
+          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition backend-rds-task)
+          
+          NEW_TASK_DEF=$(echo $TASK_DEFINITION | jq --arg IMAGE "$IMAGE_URI" \
+            '.taskDefinition | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | 
+            .containerDefinitions[0].image = $IMAGE')
+          
+          NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" | jq -r '.taskDefinition.taskDefinitionArn')
+          
+          aws ecs update-service --cluster ${{ vars.CLUSTER_NAME }} \
+            --service backend-rds-service \
+            --task-definition $NEW_TASK_ARN
