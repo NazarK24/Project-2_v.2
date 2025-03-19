@@ -50,6 +50,10 @@ resource "aws_vpc_endpoint" "s3" {
   tags = merge(var.common_tags, { Name = "s3-endpoint" })
 
   depends_on = [module.ecs]
+  
+  timeouts {
+    delete = "20m"
+  }
 }
 
 # ECR API endpoint
@@ -64,6 +68,10 @@ resource "aws_vpc_endpoint" "ecr_api" {
   tags = merge(var.common_tags, { Name = "ecr-api-endpoint" })
 
   depends_on = [module.ecs]
+  
+  timeouts {
+    delete = "20m"
+  }
 }
 
 # ECR Docker endpoint
@@ -78,6 +86,10 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
   tags = merge(var.common_tags, { Name = "ecr-dkr-endpoint" })
 
   depends_on = [module.ecs]
+  
+  timeouts {
+    delete = "20m"
+  }
 }
 
 # CloudWatch Logs endpoint
@@ -92,6 +104,10 @@ resource "aws_vpc_endpoint" "logs" {
   tags = merge(var.common_tags, { Name = "logs-endpoint" })
 
   depends_on = [module.ecs]
+  
+  timeouts {
+    delete = "20m"
+  }
 }
 
 #####################################################################
@@ -111,13 +127,12 @@ module "vpc" {
 }
 
 # ALB Module
-# Керує балансувальником навантаження
+# Керує балансувальником навантаження для бекендів
 module "alb" {
   source = "./modules/alb"
   
   vpc_id                 = module.vpc.vpc_id
   public_subnets        = module.vpc.public_subnets
-  frontend_container_port = var.frontend_container_port
   common_tags           = var.common_tags
 }
 
@@ -153,9 +168,7 @@ module "ecs" {
   ecs_cluster_name = "my-demo-ecs-cluster"
   common_tags      = var.common_tags
   
-  # Налаштування контейнерів
-  frontend_container_port = var.frontend_container_port
-  frontend_image_url      = "${module.ecr.frontend_repo_url}:${var.frontend_image_tag}"
+  # Налаштування бекенд контейнерів
   backend_rds_image_url   = "${module.ecr.backend_rds_repo_url}:${var.backend_rds_image_tag}"
   backend_redis_image_url = "${module.ecr.backend_redis_repo_url}:${var.backend_redis_image_tag}"
 
@@ -169,16 +182,19 @@ module "ecs" {
   redis_host     = module.redis.redis_endpoint
   redis_db       = "0"
 
-  # Налаштування балансувальника навантаження
-  alb_sg_id                 = module.alb.alb_sg_id
-  frontend_target_group_arn = module.alb.frontend_target_group_arn
-  frontend_listener_arn     = module.alb.frontend_listener_arn
-  alb_dns_name             = module.alb.alb_dns_name
+  # Налаштування балансувальника навантаження (тільки для бекендів)
+  alb_sg_id                   = module.alb.alb_sg_id
+  backend_rds_target_group_arn = module.alb.backend_rds_target_group_arn
+  backend_redis_target_group_arn = module.alb.backend_redis_target_group_arn
+  alb_dns_name               = module.alb.alb_dns_name
 
   # Security Groups
   rds_sg_id           = module.rds.rds_sg_id
   redis_sg_id         = module.redis.redis_sg_id
   vpc_endpoints_sg_id = aws_security_group.vpc_endpoints.id
+
+  # Додаємо CloudFront домен для CORS
+  cloudfront_domain = module.cloudfront.cloudfront_distribution_domain_name
 }
 
 #####################################################################
@@ -206,4 +222,28 @@ module "redis" {
   private_subnets = module.vpc.private_subnets
   common_tags     = var.common_tags
   ecs_sg_id       = module.ecs.ecs_sg_id
+}
+
+#####################################################################
+# Frontend Static Website Infrastructure
+#####################################################################
+
+# S3 Bucket Module
+# Зберігає статичні файли фронтенду
+module "s3_bucket" {
+  source       = "./modules/s3_bucket"
+  project_name = var.project
+  environment  = var.environment
+  common_tags  = var.common_tags
+}
+
+# CloudFront Module
+# Розподіляє статичний контент через CDN
+module "cloudfront" {
+  source             = "./modules/cloudfront"
+  s3_website_endpoint = module.s3_bucket.frontend_bucket_website_endpoint
+  alb_dns_name       = module.alb.alb_dns_name
+  project_name       = var.project
+  environment        = var.environment
+  common_tags        = var.common_tags
 }

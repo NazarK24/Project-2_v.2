@@ -130,6 +130,11 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.this]
   
   tags = merge(var.common_tags, { Name = "main-nat-gateway" })
+  
+  # Додаємо lifecycle для коректного видалення
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Маршрут через NAT Gateway для приватних підмереж

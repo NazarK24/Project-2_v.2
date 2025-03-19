@@ -89,59 +89,7 @@ resource "aws_security_group_rule" "ecs_to_endpoints" {
 #############################
 # ECS Task Definitions
 #############################
-resource "aws_ecs_task_definition" "frontend_task" {
-  family                   = "frontend-task"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
-  task_role_arn            = aws_iam_role.ecs_task_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name         = "frontend"
-      image        = var.frontend_image_url
-      cpu          = 256
-      memory       = 512
-      essential    = true
-      portMappings = [
-        {
-          containerPort = 8000
-          hostPort      = 8000
-          protocol      = "tcp"
-        }
-      ]
-      environment = [
-        { name = "DB_HOST", value = var.db_host },
-        { name = "DB_NAME", value = var.db_name },
-        { name = "DB_USER", value = var.db_username },
-        { name = "DB_PASSWORD", value = var.db_password },
-        { name = "REDIS_HOST", value = var.redis_host },
-        { name = "REDIS_PORT", value = "6379" },
-        { name = "BACKEND_RDS_URL", value = "http://rds.my-demo.local:8001/test_connection/" },
-        { name = "BACKEND_REDIS_URL", value = "http://redis.my-demo.local:8002/test_connection/" },
-        { name = "DEBUG", value = "True" }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = "/ecs/frontend"
-          "awslogs-region"        = data.aws_region.current.name
-          "awslogs-stream-prefix" = "frontend"
-          "awslogs-create-group"  = "true"
-        }
-      }
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
-        interval    = 60
-        timeout     = 30
-        retries     = 3
-        startPeriod = 180
-      }
-    }
-  ])
-}
+# Фронтенд задача видалена - тепер у S3/CloudFront
 
 resource "aws_ecs_task_definition" "backend_rds_task" {
   family                   = "backend-rds-task"
@@ -173,7 +121,15 @@ resource "aws_ecs_task_definition" "backend_rds_task" {
         { name = "DB_USER", value = var.db_username },
         { name = "DB_PASSWORD", value = var.db_password },
         { name = "DJANGO_SETTINGS_MODULE", value = "backend_rds.settings" },
-        { name = "ALLOWED_HOSTS", value = "*" }
+        { name = "ALLOWED_HOSTS", value = "*" },
+        { name = "CORS_ALLOW_ALL_ORIGINS", value = "True" },
+        { name = "CORS_ALLOW_CREDENTIALS", value = "True" },
+        { name = "CORS_ALLOWED_ORIGINS", value = "http://${var.cloudfront_domain}" },
+        { name = "CORS_ALLOWED_ORIGIN_REGEXES", value = ".*" },
+        { name = "CORS_ALLOW_METHODS", value = "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
+        { name = "CORS_ALLOW_HEADERS", value = "accept,accept-encoding,authorization,content-type,dnt,origin,user-agent,x-csrftoken,x-requested-with" },
+        { name = "API_PATH_PREFIX", value = "/test_connection" },
+        { name = "CLOUDFRONT_DOMAIN", value = var.cloudfront_domain }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -234,7 +190,15 @@ resource "aws_ecs_task_definition" "backend_redis_task" {
         { name = "REDIS_DB", value = var.redis_db },
         { name = "DJANGO_SETTINGS_MODULE", value = "backend_redis.settings" },
         { name = "DEBUG", value = "True" },
-        { name = "ALLOWED_HOSTS", value = "*" }
+        { name = "ALLOWED_HOSTS", value = "*" },
+        { name = "CORS_ALLOW_ALL_ORIGINS", value = "True" },
+        { name = "CORS_ALLOW_CREDENTIALS", value = "True" },
+        { name = "CORS_ALLOWED_ORIGINS", value = "http://${var.cloudfront_domain}" },
+        { name = "CORS_ALLOWED_ORIGIN_REGEXES", value = ".*" },
+        { name = "CORS_ALLOW_METHODS", value = "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
+        { name = "CORS_ALLOW_HEADERS", value = "accept,accept-encoding,authorization,content-type,dnt,origin,user-agent,x-csrftoken,x-requested-with" },
+        { name = "API_PATH_PREFIX", value = "/test_connection" },
+        { name = "CLOUDFRONT_DOMAIN", value = var.cloudfront_domain }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -270,37 +234,7 @@ resource "aws_ecs_task_definition" "backend_redis_task" {
 #############################
 # ECS Services
 #############################
-resource "aws_ecs_service" "frontend_service" {
-  name                               = "frontend-service"
-  cluster                           = aws_ecs_cluster.this.id
-  task_definition                   = aws_ecs_task_definition.frontend_task.arn
-  desired_count                     = 1
-  launch_type                       = "FARGATE"
-  platform_version                  = "LATEST"
-  health_check_grace_period_seconds = 120
-  force_delete                      = true
-  enable_execute_command            = true
-
-  deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = 50
-
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
-  }
-
-  network_configuration {
-    subnets          = var.private_subnets
-    security_groups  = [aws_security_group.ecs_sg.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = var.frontend_target_group_arn
-    container_name   = "frontend"
-    container_port   = 8000
-  }
-}
+# Фронтенд сервіс видалений - тепер у S3/CloudFront
 
 resource "aws_ecs_service" "backend_rds_service" {
   name                               = "backend-rds-service"
@@ -329,6 +263,13 @@ resource "aws_ecs_service" "backend_rds_service" {
 
   service_registries {
     registry_arn = aws_service_discovery_service.backend_rds.arn
+  }
+  
+  # Підключення до ALB Target Group для доступу ззовні через ALB
+  load_balancer {
+    target_group_arn = var.backend_rds_target_group_arn
+    container_name   = "backend-rds"
+    container_port   = 8001
   }
 }
 
@@ -359,6 +300,13 @@ resource "aws_ecs_service" "backend_redis_service" {
 
   service_registries {
     registry_arn = aws_service_discovery_service.backend_redis.arn
+  }
+  
+  # Підключення до ALB Target Group для доступу ззовні через ALB
+  load_balancer {
+    target_group_arn = var.backend_redis_target_group_arn
+    container_name   = "backend-redis"
+    container_port   = 8002
   }
 }
 
@@ -495,12 +443,6 @@ resource "aws_iam_role_policy" "ecs_task_role_policy" {
   })
 }
 
-resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/frontend"
-  retention_in_days = 14
-  tags              = var.common_tags
-}
-
 resource "aws_cloudwatch_log_group" "backend_rds" {
   name              = "/ecs/backend-rds"
   retention_in_days = 14
@@ -523,24 +465,6 @@ resource "aws_cloudwatch_metric_alarm" "ecs_cpu" {
   period             = "300"
   statistic          = "Average"
   threshold          = "80"
-}
-
-# Моніторинг Frontend сервісу
-resource "aws_cloudwatch_metric_alarm" "service_health" {
-  alarm_name          = "frontend-service-health"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "HealthyTaskCount"
-  namespace           = "AWS/ECS"
-  period             = "60"
-  statistic          = "Average"
-  threshold          = "1"
-  alarm_description  = "This metric monitors frontend service health"
-  
-  dimensions = {
-    ClusterName = aws_ecs_cluster.this.name
-    ServiceName = aws_ecs_service.frontend_service.name
-  }
 }
 
 # Моніторинг Backend RDS сервісу
@@ -579,9 +503,9 @@ resource "aws_cloudwatch_metric_alarm" "backend_redis_health" {
   }
 }
 
-# Моніторинг пам'яті
-resource "aws_cloudwatch_metric_alarm" "memory_utilization" {
-  alarm_name          = "ecs-memory-utilization"
+# Моніторинг пам'яті для RDS сервісу
+resource "aws_cloudwatch_metric_alarm" "rds_memory_utilization" {
+  alarm_name          = "ecs-rds-memory-utilization"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "2"
   metric_name         = "MemoryUtilization"
@@ -589,10 +513,29 @@ resource "aws_cloudwatch_metric_alarm" "memory_utilization" {
   period             = "300"
   statistic          = "Average"
   threshold          = "80"
-  alarm_description  = "Memory utilization is too high"
+  alarm_description  = "RDS service memory utilization is too high"
 
   dimensions = {
     ClusterName = aws_ecs_cluster.this.name
+    ServiceName = aws_ecs_service.backend_rds_service.name
+  }
+}
+
+# Моніторинг пам'яті для Redis сервісу
+resource "aws_cloudwatch_metric_alarm" "redis_memory_utilization" {
+  alarm_name          = "ecs-redis-memory-utilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "MemoryUtilization"
+  namespace           = "AWS/ECS"
+  period             = "300"
+  statistic          = "Average"
+  threshold          = "80"
+  alarm_description  = "Redis service memory utilization is too high"
+
+  dimensions = {
+    ClusterName = aws_ecs_cluster.this.name
+    ServiceName = aws_ecs_service.backend_redis_service.name
   }
 }
 
@@ -642,24 +585,7 @@ resource "aws_appautoscaling_policy" "ecs_policy_memory" {
   }
 }
 
-# Моніторинг Frontend 5XX помилок
-resource "aws_cloudwatch_metric_alarm" "alb_5xx_errors" {
-  alarm_name          = "frontend-5xx-errors"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "HTTPCode_Target_5XX_Count"
-  namespace           = "AWS/ApplicationELB"
-  period             = "300"
-  statistic          = "Sum"
-  threshold          = "10"
-  alarm_description  = "Too many 5XX errors in frontend service"
-
-  dimensions = {
-    TargetGroup = aws_ecs_service.frontend_service.name
-  }
-}
-
-# Додаємо автоскейлінг для backend-redis
+# Додати автоскейлінг для ECS сервісів
 resource "aws_appautoscaling_target" "backend_redis" {
   max_capacity       = 4
   min_capacity       = 1

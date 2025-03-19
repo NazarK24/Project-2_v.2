@@ -43,20 +43,19 @@ variable "frontend_container_port" {
 }
 
 variable "frontend_target_group_arn" {
-  type = string
-}
-
-variable "frontend_listener_arn" {
-  type = string
+  description = "ARN of the frontend target group for the ALB"
+  type        = string
+  default     = ""
 }
 
 variable "frontend_image_url" {
   type        = string
   description = "URL for frontend container image"
+  default     = ""
 }
 
 variable "frontend_desired_count" {
-  default = 1
+  default = 0
 }
 
 # Backend RDS Variables
@@ -136,4 +135,21 @@ variable "project_name" {
   description = "Project name"
   type        = string
   default     = "my-demo"
+}
+
+# Нові змінні для бекенд Target Groups
+variable "backend_rds_target_group_arn" {
+  description = "ARN of the backend RDS target group for the ALB"
+  type        = string
+}
+
+variable "backend_redis_target_group_arn" {
+  description = "ARN of the backend Redis target group for the ALB"
+  type        = string
+}
+
+variable "cloudfront_domain" {
+  description = "CloudFront distribution domain name for CORS configuration"
+  type        = string
+  default     = "*"  # За замовчуванням дозволяємо всі домени
 }

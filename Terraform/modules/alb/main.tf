@@ -99,32 +99,69 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
 # Target Group Configuration
 #####################################################################
 
-resource "aws_lb_target_group" "frontend" {
-  name        = "frontend-tg-${formatdate("YYYYMMDDHHmm", timestamp())}"
-  port        = 8000
+#####################################################################
+# Backend API Target Groups
+#####################################################################
+
+# Target Group для RDS бекенд сервісу
+resource "aws_lb_target_group" "backend_rds" {
+  name        = "backend-rds-tg-${formatdate("YYYYMMDDHHmm", timestamp())}"
+  port        = var.backend_rds_container_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
-
+  
   # Налаштування перевірки здоров'я
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    interval            = 60
-    matcher             = "200"
-    path                = "/"
+    interval            = 30
+    matcher             = "200,301,302,401,403"
+    path                = "/test_connection/"
     port                = "traffic-port"
     protocol            = "HTTP"
-    timeout             = 30
-    unhealthy_threshold = 3
+    timeout             = 15
+    unhealthy_threshold = 5
   }
-
-  tags = {
-    Name        = "frontend-tg"
+  
+  tags = merge(var.common_tags, {
+    Name        = "backend-rds-tg"
     Environment = var.environment
     Project     = var.project_name
+  })
+  
+  lifecycle {
+    create_before_destroy = true
   }
+}
 
+# Target Group для Redis бекенд сервісу
+resource "aws_lb_target_group" "backend_redis" {
+  name        = "backend-redis-tg-${formatdate("YYYYMMDDHHmm", timestamp())}"
+  port        = var.backend_redis_container_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+  
+  # Налаштування перевірки здоров'я
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200,301,302,401,403"
+    path                = "/test_connection/"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 15
+    unhealthy_threshold = 5
+  }
+  
+  tags = merge(var.common_tags, {
+    Name        = "backend-redis-tg"
+    Environment = var.environment
+    Project     = var.project_name
+  })
+  
   lifecycle {
     create_before_destroy = true
   }
@@ -134,14 +171,131 @@ resource "aws_lb_target_group" "frontend" {
 # Listener Configuration
 #####################################################################
 
-resource "aws_lb_listener" "frontend_listener" {
+# Listener для RDS бекенду (порт 8001)
+resource "aws_lb_listener" "backend_rds_listener" {
   load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = 80
+  port              = 8001
   protocol          = "HTTP"
-
+  
   default_action {
+    type             = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\": \"Resource not found\"}"
+      status_code  = "404"
+    }
+  }
+  
+  tags = merge(var.common_tags, {
+    Name = "rds-listener"
+  })
+}
+
+# Listener для Redis бекенду (порт 8002)
+resource "aws_lb_listener" "backend_redis_listener" {
+  load_balancer_arn = aws_lb.frontend_alb.arn
+  port              = 8002
+  protocol          = "HTTP"
+  
+  default_action {
+    type             = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\": \"Resource not found\"}"
+      status_code  = "404"
+    }
+  }
+  
+  tags = merge(var.common_tags, {
+    Name = "redis-listener"
+  })
+}
+
+# Правило для обробки OPTIONS запитів для CORS на рівні ALB
+resource "aws_lb_listener_rule" "backend_rds_options_rule" {
+  listener_arn = aws_lb_listener.backend_rds_listener.arn
+  priority     = 5
+
+  action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"message\": \"CORS preflight response\"}"
+      status_code  = "200"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+    }
+  }
+
+  condition {
+    http_request_method {
+      values = ["OPTIONS"]
+    }
+  }
+}
+
+# Правило для обробки OPTIONS запитів для CORS на рівні ALB - Redis
+resource "aws_lb_listener_rule" "backend_redis_options_rule" {
+  listener_arn = aws_lb_listener.backend_redis_listener.arn
+  priority     = 5
+
+  action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"message\": \"CORS preflight response\"}"
+      status_code  = "200"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+    }
+  }
+
+  condition {
+    http_request_method {
+      values = ["OPTIONS"]
+    }
+  }
+}
+
+# Модифікуємо існуюче правило для додавання CORS заголовків до звичайних відповідей
+resource "aws_lb_listener_rule" "backend_rds_rule" {
+  listener_arn = aws_lb_listener.backend_rds_listener.arn
+  priority     = 2
+
+  action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.backend_rds.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+    }
+  }
+}
+
+# Модифікуємо існуюче правило для додавання CORS заголовків до звичайних відповідей
+resource "aws_lb_listener_rule" "backend_redis_rule" {
+  listener_arn = aws_lb_listener.backend_redis_listener.arn
+  priority     = 2
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_redis.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+    }
   }
 }
 
@@ -150,16 +304,26 @@ resource "aws_lb_listener" "frontend_listener" {
 #####################################################################
 
 resource "aws_security_group" "alb_sg" {
-  name   = "alb-sg"
-  vpc_id = var.vpc_id
-
-  # Дозволяємо вхідний HTTP трафік
+  name        = "alb-sg"
+  description = "Security group for ALB"
+  vpc_id      = var.vpc_id
+  
+  # Дозволяємо вхідний трафік на порт 8001 (RDS бекенд)
   ingress {
-    description = "Allow HTTP traffic"
-    from_port   = 80
-    to_port     = 80
+    from_port   = 8001
+    to_port     = 8001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow RDS backend traffic"
+  }
+  
+  # Дозволяємо вхідний трафік на порт 8002 (Redis бекенд)
+  ingress {
+    from_port   = 8002
+    to_port     = 8002
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow Redis backend traffic"
   }
 
   # Дозволяємо весь вихідний трафік
@@ -168,11 +332,11 @@ resource "aws_security_group" "alb_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound"
   }
 
   tags = merge(var.common_tags, {
-    Name    = "alb-sg"
-    Purpose = "ALB security"
+    Name = "alb-sg"
   })
 }
 
@@ -204,4 +368,6 @@ data "aws_elb_service_account" "current" {}
 data "aws_vpc" "selected" {
   id = var.vpc_id
 }
+
+# Код AWS WAF і Lambda функцій був повністю видалений
 
