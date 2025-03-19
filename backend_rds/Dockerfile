@@ -1,18 +1,22 @@
-# Вибираємо офіційний базовий образ Python
-FROM python:3.9-slim
+# backendrds/Dockerfile
 
-# Встановлюємо робочу директорію всередині конте
+# Use the official Python image from the Docker Hub
+FROM python:3.9
+
+# Set the working directory in the container
 WORKDIR /app
 
-# Копіюємо файл requirements.txt і встановлюємо залежн
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the requirements file into the container
+COPY requirements.txt /app/
 
-# Копіюємо весь код в контейне
-COPY . . 
+# Install any dependencies
+RUN pip install -r requirements.txt
 
-# Відкриваємо порт, на якому буде працювати додаток
+# Copy the current directory contents into the container at /app
+COPY . /app/
+
+# Make port 8001 available to the world outside this container
 EXPOSE 8001
 
-# Запускаємо додаток
+# Run the command to start the Django server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]
