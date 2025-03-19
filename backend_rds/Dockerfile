@@ -1,15 +1,11 @@
 # Вибираємо офіційний базовий образ Python
-FROM python:3.11-slim
-
-# Додаємо метаінформацію про об
-ARG VERSION=unknown
-LABEL version=$VERSION
+FROM python:3.9-slim
 
 # Встановлюємо робочу директорію всередині конте
 WORKDIR /app
 
 # Копіюємо файл requirements.txt і встановлюємо залежн
-COPY requirements.txt /app/
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копіюємо весь код в контейне
