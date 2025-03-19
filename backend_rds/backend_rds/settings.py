@@ -76,7 +76,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend_rds.wsgi.application'
 
-# Data
+# Dat
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
 DATABASES = {
