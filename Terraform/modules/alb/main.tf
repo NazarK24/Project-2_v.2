@@ -211,6 +211,10 @@ resource "aws_lb_listener" "backend_redis_listener" {
   })
 }
 
+#####################################################################
+# Listener Rules Configuration
+#####################################################################
+
 # Правило для обробки OPTIONS запитів для CORS на рівні ALB
 resource "aws_lb_listener_rule" "backend_rds_options_rule" {
   listener_arn = aws_lb_listener.backend_rds_listener.arn
@@ -265,7 +269,41 @@ resource "aws_lb_listener_rule" "backend_redis_options_rule" {
   }
 }
 
-# Модифікуємо існуюче правило для додавання CORS заголовків до звичайних відповідей
+# Правило для шляху /test_connection (без слешу в кінці) для RDS
+resource "aws_lb_listener_rule" "backend_rds_rule_root" {
+  listener_arn = aws_lb_listener.backend_rds_listener.arn
+  priority     = 1
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_rds.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection"]
+    }
+  }
+}
+
+# Правило для шляху /test_connection (без слешу в кінці) для Redis
+resource "aws_lb_listener_rule" "backend_redis_rule_root" {
+  listener_arn = aws_lb_listener.backend_redis_listener.arn
+  priority     = 1
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_redis.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/test_connection"]
+    }
+  }
+}
+
+# Правило для шляху /test_connection/ (з слешом) та підшляхів для RDS
 resource "aws_lb_listener_rule" "backend_rds_rule" {
   listener_arn = aws_lb_listener.backend_rds_listener.arn
   priority     = 2
@@ -277,12 +315,12 @@ resource "aws_lb_listener_rule" "backend_rds_rule" {
 
   condition {
     path_pattern {
-      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+      values = ["/test_connection/", "/test_connection/*"]
     }
   }
 }
 
-# Модифікуємо існуюче правило для додавання CORS заголовків до звичайних відповідей
+# Правило для шляху /test_connection/ (з слешом) та підшляхів для Redis
 resource "aws_lb_listener_rule" "backend_redis_rule" {
   listener_arn = aws_lb_listener.backend_redis_listener.arn
   priority     = 2
@@ -294,7 +332,7 @@ resource "aws_lb_listener_rule" "backend_redis_rule" {
 
   condition {
     path_pattern {
-      values = ["/test_connection", "/test_connection/", "/test_connection/*"]
+      values = ["/test_connection/", "/test_connection/*"]
     }
   }
 }
