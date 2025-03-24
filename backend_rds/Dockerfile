@@ -6,7 +6,7 @@ FROM python:3.9
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container
+# Copy the requirements file into the containe
 COPY requirements.txt /app/
 
 # Install any dependencies

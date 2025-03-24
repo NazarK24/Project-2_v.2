@@ -11,19 +11,6 @@ resource "aws_cloudfront_distribution" "frontend_distribution" {
     }
   }
 
-  # Додаємо ще один origin для бекенд-сервісів через ALB
-  origin {
-    domain_name = var.alb_dns_name
-    origin_id   = "ALB-${var.project_name}-${var.environment}-backend"
-    
-    custom_origin_config {
-      http_port              = 8001  # Порт для RDS бекенду
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1", "TLSv1.1", "TLSv1.2"]
-    }
-  }
-
   enabled             = true
   is_ipv6_enabled     = true
   comment             = "${var.project_name} frontend distribution"
@@ -47,28 +34,6 @@ resource "aws_cloudfront_distribution" "frontend_distribution" {
     default_ttl            = 3600
     max_ttl                = 86400
 
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.cors_policy.id
-  }
-
-  ordered_cache_behavior {
-    path_pattern     = "/test_connection/*"
-    allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "ALB-${var.project_name}-${var.environment}-backend"
-
-    forwarded_values {
-      query_string = true
-      headers      = ["*"]
-      cookies {
-        forward = "all"
-      }
-    }
-
-    viewer_protocol_policy = "allow-all"
-    min_ttl                = 0
-    default_ttl            = 0
-    max_ttl                = 0
-    
     response_headers_policy_id = aws_cloudfront_response_headers_policy.cors_policy.id
   }
 

@@ -242,7 +242,6 @@ module "s3_bucket" {
 module "cloudfront" {
   source             = "./modules/cloudfront"
   s3_website_endpoint = module.s3_bucket.frontend_bucket_website_endpoint
-  alb_dns_name       = module.alb.alb_dns_name
   project_name       = var.project
   environment        = var.environment
   common_tags        = var.common_tags

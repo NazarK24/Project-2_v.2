@@ -30,8 +30,9 @@ jobs:
       - name: Build and push Docker image
         run: |
           REPO_NAME="my-demo-backend-redis"
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
-          docker build -t $IMAGE_URI --build-arg VERSION=$IMAGE_VERSION ./backend_redis
+          IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-redis:$IMAGE_VERSION
+          echo $IMAGE_URI
+          docker build -t $IMAGE_URI ./backend_redis
           docker push $IMAGE_URI
 
       - name: Create backend_redis.tfvars
@@ -61,7 +62,7 @@ jobs:
         run: |
           REPO_NAME="my-demo-backend-redis"
           IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-redis:$IMAGE_VERSION
           
           TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition backend-redis-task)
           

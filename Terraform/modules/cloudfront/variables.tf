@@ -16,9 +16,4 @@ variable "environment" {
 variable "common_tags" {
   description = "Common tags for all resources"
   type        = map(string)
-}
-
-variable "alb_dns_name" {
-  description = "DNS name of the ALB for backend services"
-  type        = string
 } 
