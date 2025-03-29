@@ -1,3 +1,4 @@
+
 name: Backend RDS CI/CD
 
 on:
@@ -13,6 +14,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set Docker image version
+        id: version
+        run: echo "IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -23,13 +28,23 @@ jobs:
       - name: Log in to AWS ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push Docker images
+      - name: Build and push Docker image
         run: |
-          COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          docker build -t backend_rds:$COMMIT_SHA ./backend_rds
-          docker tag backend_rds:$COMMIT_SHA 148761653308.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
-
+          REPO_NAME="my-demo-backend-rds"
+          IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
+          echo $IMAGE_URI
+          docker build -t $IMAGE_URI ./backend_rds
+          docker push $IMAGE_URI
+          
+      - name: Create backend_rds.tfvars
+        run: |
+          echo "backend_rds_image_tag = \"$IMAGE_VERSION\"" > backend_rds.tfvars
+      - name: Upload backend_rds.tfvars as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-rds-vars
+          path: backend_rds.tfvars
+          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,7 +62,7 @@ jobs:
         run: |
           REPO_NAME="my-demo-backend-rds"
           IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
           
           TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition backend-rds-task)
           
