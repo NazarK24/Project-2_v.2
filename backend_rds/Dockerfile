@@ -3,7 +3,7 @@
 # Use the official Python image from the Docker Hu
 FROM python:3.9
 
-# Set the working directory in the container
+# Set the working directory in the containe
 WORKDIR /app
 
 # Copy the requirements file into the containe
