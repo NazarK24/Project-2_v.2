@@ -30,11 +30,9 @@ jobs:
       - name: Build and push Docker image
         run: |
           REPO_NAME="my-demo-backend-rds"
-          IMAGE_URI="148761653308.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME"
-          echo $IMAGE_URI
-          docker build -t backend_rds ./backend_rds
-          docker tag backend_rds:latest $IMAGE_URI:$IMAGE_VERSION
-          docker push $IMAGE_URI:$IMAGE_VERSION
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          docker build -t $IMAGE_URI --build-arg VERSION=$IMAGE_VERSION ./backend_rds
+          docker push $IMAGE_URI
 
       - name: Create backend_rds.tfvars
         run: |
