@@ -13,10 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set Docker image version
-        id: version
-        run: echo "IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -27,13 +23,12 @@ jobs:
       - name: Log in to AWS ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+      - name: Build and Push Docker images
         run: |
-          REPO_NAME="my-demo-backend-rds"
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
-          echo $IMAGE_URI
-          docker build -t $IMAGE_URI ./backend_rds
-          docker push $IMAGE_URI
+          COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          docker build -t backend_rds:$COMMIT_SHA ./backend_rds
+          docker tag backend_rds:$COMMIT_SHA ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
 
 
   deploy:
