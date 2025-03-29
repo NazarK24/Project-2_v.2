@@ -35,16 +35,6 @@ jobs:
           echo $IMAGE_URI
           docker build -t $IMAGE_URI ./backend_rds
           docker push $IMAGE_URI
-          
-      - name: Create backend_rds.tfvars
-        run: |
-          echo "backend_rds_image_tag = \"$IMAGE_VERSION\"" > backend_rds.tfvars
-      - name: Upload backend_rds.tfvars as an artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-rds-vars
-          path: backend_rds.tfvars
-          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
