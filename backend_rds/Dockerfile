@@ -1,6 +1,6 @@
 # backendrds/Dockerfile
 
-# Use the official Python image from the Docker Hub
+# Use the official Python image from the Docker Hu
 FROM python:3.9
 
 # Set the working directory in the container
