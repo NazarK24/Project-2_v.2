@@ -23,10 +23,10 @@ jobs:
     
           - name: Sync frontend templates with S3
             run: |
-              aws s3 sync ./frontend/templates s3://frontent-static-bucket --delete
+              aws s3 sync ./frontend/templates s3://my-demo-dev-frontend-static --delete
           - name: Sync config file with S3
             run: |
-              aws s3 cp ./frontend/config.json s3://frontent-static-bucket/config.json
+              aws s3 cp ./frontend/config.json s3://my-demo-dev-frontend-static/config.json
           - name: Invalidate CloudFront cache
             run: |
               aws cloudfront create-invalidation --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
