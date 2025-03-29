@@ -1,5 +1,4 @@
 {
-    "BACKEND_RDS_URL": "http://frontend-alb-238382677.eu-north-1.elb.amazonaws.com:8001/test_connection/",
+    "BACKEND_RDS_URL": "http://frontend-alb-238382677.eu-north-1.elb.amazonaws.com:8001/test_connection/*",
     "BACKEND_REDIS_URL": "http://frontend-alb-238382677.eu-north-1.elb.amazonaws.com:8002/test_connection/"
   }
-  
