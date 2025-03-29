@@ -1,3 +1,4 @@
+
 name: Backend Redis CI/CD
 
 on:
@@ -22,29 +23,17 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Log in to AWS ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
         run: |
-          REPO_NAME="my-demo-backend-redis"
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-demo-backend-redis:$IMAGE_VERSION"
           echo $IMAGE_URI
           docker build -t $IMAGE_URI ./backend_redis
           docker push $IMAGE_URI
-
-      - name: Create backend_redis.tfvars
-        run: |
-          echo "backend_redis_image_tag = \"$IMAGE_VERSION\"" > backend_redis.tfvars
-
-      - name: Upload backend_redis.tfvars as an artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-redis-vars
-          path: backend_redis.tfvars
-          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -56,13 +45,12 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Оновити Task Definition, деплоїти
         run: |
-          REPO_NAME="my-demo-backend-redis"
           IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)
-          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/$REPO_NAME:$IMAGE_VERSION
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-demo-backend-redis:$IMAGE_VERSION"
           
           TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition backend-redis-task)
           

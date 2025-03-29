@@ -15,7 +15,7 @@ RUN pip install -r requirements.txt
 # Copy the current directory contents into the container at /app
 COPY . /app/
 
-# Make port 8001 available to the world outside this co
+# Make port 8001 available to the world outside this c
 EXPOSE 8001
 
 # Run the command to start the Django server
