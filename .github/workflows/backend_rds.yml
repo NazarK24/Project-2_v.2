@@ -30,7 +30,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          echo "IMAGE_URI=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION"
+          IMAGE_URI=${{vars.AWS_ACCOUNT_ID}}.dkr.ecr.${{vars.AWS_REGION}}.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
           echo $IMAGE_URI
           docker build -t $IMAGE_URI ./backend_rds
           docker push $IMAGE_URI
