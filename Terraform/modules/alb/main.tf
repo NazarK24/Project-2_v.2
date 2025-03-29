@@ -13,86 +13,51 @@ resource "aws_lb" "frontend_alb" {
   enable_deletion_protection = false
   enable_cross_zone_load_balancing = true
 
-  # Налаштування логування
-  access_logs {
-    bucket  = aws_s3_bucket.alb_logs.id
-    prefix  = "alb-logs"
-    enabled = true
-  }
-
   tags = merge(var.common_tags, { Name = "frontend-alb" })
 }
 
 #####################################################################
-# ALB Logs S3 Bucket Configuration
+# Listener Configuration
 #####################################################################
 
-resource "aws_s3_bucket" "alb_logs" {
-  bucket        = "my-demo-alb-logs-${data.aws_caller_identity.current.account_id}"
-  force_destroy = true
-
+# Listener для RDS бекенду (порт 8001)
+resource "aws_lb_listener" "backend_rds_listener" {
+  load_balancer_arn = aws_lb.frontend_alb.arn
+  port              = 8001
+  protocol          = "HTTP"
+  
+  default_action {
+    type             = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\": \"Resource not found\"}"
+      status_code  = "404"
+    }
+  }
+  
   tags = merge(var.common_tags, {
-    Name = "alb-logs"
+    Name = "rds-listener"
   })
 }
 
-# Політика доступу до S3 бакета
-resource "aws_s3_bucket_policy" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_elb_service_account.current.id}:root"
-        }
-        Action = [
-          "s3:PutObject"
-        ]
-        Resource = [
-          "${aws_s3_bucket.alb_logs.arn}/*"
-        ]
-      }
-    ]
+# Listener для Redis бекенду (порт 8002)
+resource "aws_lb_listener" "backend_redis_listener" {
+  load_balancer_arn = aws_lb.frontend_alb.arn
+  port              = 8002
+  protocol          = "HTTP"
+  
+  default_action {
+    type             = "fixed-response"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\": \"Resource not found\"}"
+      status_code  = "404"
+    }
+  }
+  
+  tags = merge(var.common_tags, {
+    Name = "redis-listener"
   })
-}
-
-# Налаштування власності об'єктів
-resource "aws_s3_bucket_ownership_controls" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-  
-  rule {
-    object_ownership = "BucketOwnerPreferred"
-  }
-}
-
-# Блокування публічного доступу
-resource "aws_s3_bucket_public_access_block" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# Налаштування ACL
-resource "aws_s3_bucket_acl" "alb_logs" {
-  depends_on = [aws_s3_bucket_ownership_controls.alb_logs]
-  
-  bucket = aws_s3_bucket.alb_logs.id
-  acl    = "private"
-}
-
-# Налаштування версіонування
-resource "aws_s3_bucket_versioning" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-  
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 #####################################################################
@@ -165,50 +130,6 @@ resource "aws_lb_target_group" "backend_redis" {
   lifecycle {
     create_before_destroy = true
   }
-}
-
-#####################################################################
-# Listener Configuration
-#####################################################################
-
-# Listener для RDS бекенду (порт 8001)
-resource "aws_lb_listener" "backend_rds_listener" {
-  load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = 8001
-  protocol          = "HTTP"
-  
-  default_action {
-    type             = "fixed-response"
-    fixed_response {
-      content_type = "application/json"
-      message_body = "{\"error\": \"Resource not found\"}"
-      status_code  = "404"
-    }
-  }
-  
-  tags = merge(var.common_tags, {
-    Name = "rds-listener"
-  })
-}
-
-# Listener для Redis бекенду (порт 8002)
-resource "aws_lb_listener" "backend_redis_listener" {
-  load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = 8002
-  protocol          = "HTTP"
-  
-  default_action {
-    type             = "fixed-response"
-    fixed_response {
-      content_type = "application/json"
-      message_body = "{\"error\": \"Resource not found\"}"
-      status_code  = "404"
-    }
-  }
-  
-  tags = merge(var.common_tags, {
-    Name = "redis-listener"
-  })
 }
 
 #####################################################################
@@ -402,10 +323,6 @@ resource "aws_cloudwatch_metric_alarm" "target_5xx_errors" {
 #####################################################################
 
 data "aws_caller_identity" "current" {}
-data "aws_elb_service_account" "current" {}
 data "aws_vpc" "selected" {
   id = var.vpc_id
 }
-
-# Код AWS WAF і Lambda функцій був повністю видалений
-

@@ -8,11 +8,6 @@ output "alb_sg_id" {
   value = aws_security_group.alb_sg.id
 }
 
-output "alb_logs_bucket" {
-  description = "ID of the ALB logs bucket"
-  value = aws_s3_bucket.alb_logs.id
-}
-
 output "alb_arn_suffix" {
   description = "ARN suffix of the ALB"
   value = aws_lb.frontend_alb.arn_suffix
