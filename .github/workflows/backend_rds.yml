@@ -30,8 +30,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          REPO_NAME="my-demo-backend-rds"
-          IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
+          IMAGE_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
           echo $IMAGE_URI
           docker build -t $IMAGE_URI ./backend_rds
           docker push $IMAGE_URI
@@ -50,7 +49,6 @@ jobs:
 
       - name: Оновити Task Definition, деплоїти
         run: |
-          REPO_NAME="my-demo-backend-rds"
           IMAGE_VERSION=$(echo ${GITHUB_SHA} | cut -c1-7)
           IMAGE_URI=148761653308.dkr.ecr.eu-north-1.amazonaws.com/my-demo-backend-rds:$IMAGE_VERSION
           
