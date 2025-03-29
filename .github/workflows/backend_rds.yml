@@ -27,7 +27,7 @@ jobs:
         run: |
           COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           docker build -t backend_rds:$COMMIT_SHA ./backend_rds
-          docker tag backend_rds:$COMMIT_SHA ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
+          docker tag backend_rds:$COMMIT_SHA 148761653308.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/backend_rds:$COMMIT_SHA
 
 
