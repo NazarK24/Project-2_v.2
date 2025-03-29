@@ -6,7 +6,7 @@ FROM python:3.9
 # Set the working directory in the containe
 WORKDIR /app
 
-# Copy the requirements file into the co
+# Copy the requirements file into the c
 COPY requirements.txt /app/
 
 # Install any dependencies
